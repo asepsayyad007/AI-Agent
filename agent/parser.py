@@ -4,68 +4,41 @@ import re
 
 def parse_ai_response(reply: str):
     """
-    Parses AI responses.
-
-    Returns:
-
-    {
-        "type": "tool",
-        "data": {...}
-    }
-
-    or
-
-    {
-        "type": "plan",
-        "data": [...]
-    }
-
-    or
-
-    {
-        "type": "text",
-        "data": "..."
-    }
+    Parse AI response into one of:
+    - text
+    - tool
+    - plan
     """
 
-    reply = reply.strip()
+    text = reply.strip()
 
-    # Remove markdown
+    # Extract JSON from markdown blocks
     match = re.search(
         r"```(?:json)?\s*(.*?)\s*```",
-        reply,
-        re.DOTALL
+        text,
+        re.DOTALL,
     )
 
     if match:
-        reply = match.group(1).strip()
+        text = match.group(1).strip()
 
     try:
-
-        obj = json.loads(reply)
-
-        # -------------------------
-        # Single Tool
-        # -------------------------
+        obj = json.loads(text)
 
         if isinstance(obj, dict):
 
-            if "tool" in obj:
-
-                return {
-                    "type": "tool",
-                    "data": obj
-                }
-
-            # -------------------------
-            # Planner
-            # -------------------------
-
+            # Planner response
             if "plan" in obj:
-
                 return {
                     "type": "plan",
-                    "data": obj["plan"]
+                    "data": obj,
+                }
+
+            # Legacy single tool
+            if "tool" in obj:
+                return {
+                    "type": "tool",
+                    "data": obj,
                 }
 
     except Exception:
@@ -73,5 +46,5 @@ def parse_ai_response(reply: str):
 
     return {
         "type": "text",
-        "data": reply
+        "data": reply,
     }

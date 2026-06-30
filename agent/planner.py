@@ -1,12 +1,12 @@
 from dataclasses import dataclass, field
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
 
 @dataclass
 class Plan:
     goal: str
-    summary: str
-    risk: str
+    summary: str = ""
+    risk: str = ""
     actions: List[Dict[str, Any]] = field(default_factory=list)
 
 
@@ -25,19 +25,29 @@ class Planner:
 
         errors = []
 
+        # Goal is mandatory
         if not plan.goal.strip():
             errors.append("Goal is missing.")
 
-        if not plan.summary.strip():
-            errors.append("Summary is missing.")
-
-        if plan.risk not in ["LOW", "MEDIUM", "HIGH"]:
-            errors.append("Risk must be LOW, MEDIUM or HIGH.")
-
+        # Plan must contain at least one action
         if len(plan.actions) == 0:
             errors.append("Plan contains no actions.")
 
+        # Risk is optional
+        if plan.risk:
+            if plan.risk.upper() not in ("LOW", "MEDIUM", "HIGH"):
+                errors.append(
+                    "Risk must be LOW, MEDIUM or HIGH."
+                )
+
+        # Validate every action
         for i, action in enumerate(plan.actions, start=1):
+
+            if not isinstance(action, dict):
+                errors.append(
+                    f"Step {i}: Invalid action."
+                )
+                continue
 
             tool = action.get("tool")
 
@@ -47,17 +57,33 @@ class Planner:
                 )
                 continue
 
+            # ----------------------------
+            # Terminal
+            # ----------------------------
+
             if tool == "terminal":
-                if "command" not in action:
+
+                if not action.get("command"):
                     errors.append(
                         f"Step {i}: Missing command."
                     )
 
-            else:
+                continue
 
-                if "path" not in action:
+            # ----------------------------
+            # Filesystem tools
+            # ----------------------------
+
+            if not action.get("path"):
+                errors.append(
+                    f"Step {i}: Missing path."
+                )
+
+            if tool == "write_file":
+
+                if "content" not in action:
                     errors.append(
-                        f"Step {i}: Missing path."
+                        f"Step {i}: Missing content."
                     )
 
         return errors
@@ -69,18 +95,17 @@ class Planner:
         print("                EXECUTION PLAN")
         print("=" * 60)
 
-        print(f"\nGoal")
-        print(f"  {plan.goal}")
+        print(f"\nGoal:\n  {plan.goal}")
 
-        print(f"\nSummary")
-        print(f"  {plan.summary}")
+        if plan.summary:
+            print(f"\nSummary:\n  {plan.summary}")
 
-        print(f"\nRisk")
-        print(f"  {plan.risk}")
+        if plan.risk:
+            print(f"\nRisk:\n  {plan.risk}")
 
-        create = []
-        read = []
-        delete = []
+        create_files = []
+        read_files = []
+        delete_files = []
         commands = []
 
         for action in plan.actions:
@@ -88,43 +113,39 @@ class Planner:
             tool = action["tool"]
 
             if tool == "write_file":
-                create.append(action["path"])
+                create_files.append(action["path"])
 
             elif tool == "read_file":
-                read.append(action["path"])
+                read_files.append(action["path"])
 
             elif tool == "delete_file":
-                delete.append(action["path"])
+                delete_files.append(action["path"])
 
             elif tool == "terminal":
                 commands.append(action["command"])
 
-        if create:
-
+        if create_files:
             print("\nCreate Files")
+            print("-" * 20)
+            for f in create_files:
+                print(f"+ {f}")
 
-            for f in create:
-                print(f"  + {f}")
-
-        if read:
-
+        if read_files:
             print("\nRead Files")
+            print("-" * 20)
+            for f in read_files:
+                print(f"* {f}")
 
-            for f in read:
-                print(f"  * {f}")
-
-        if delete:
-
+        if delete_files:
             print("\nDelete Files")
-
-            for f in delete:
-                print(f"  - {f}")
+            print("-" * 20)
+            for f in delete_files:
+                print(f"- {f}")
 
         if commands:
-
             print("\nCommands")
-
+            print("-" * 20)
             for cmd in commands:
-                print(f"  > {cmd}")
+                print(f"> {cmd}")
 
         print("\n" + "=" * 60)

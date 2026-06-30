@@ -2,6 +2,7 @@ import json
 
 from agent.graph import ask
 from agent.parser import parse_ai_response
+from agent.planner import Plan, Planner
 from agent.approval import request_approval, reset
 from tools.dispatcher import execute
 
@@ -15,81 +16,134 @@ while True:
 
     user = input("\nYou > ").strip()
 
-    if user.lower() in ["exit", "quit"]:
+    if user.lower() in ("exit", "quit"):
         break
 
-    history.append({
-        "role": "user",
-        "content": user
-    })
+    history.append(
+        {
+            "role": "user",
+            "content": user,
+        }
+    )
 
     reply = ask(history)
 
-    print("\nAI:\n")
-    print(reply)
-
     parsed = parse_ai_response(reply)
 
-    # -----------------------------------
-    # Normal Text
-    # -----------------------------------
+    # ----------------------------------------
+    # TEXT
+    # ----------------------------------------
 
     if parsed["type"] == "text":
 
-        history.append({
-            "role": "assistant",
-            "content": parsed["data"]
-        })
+        print("\nAI:\n")
+        print(parsed["data"])
+
+        history.append(
+            {
+                "role": "assistant",
+                "content": parsed["data"],
+            }
+        )
 
         continue
 
-    # -----------------------------------
-    # Single Tool (Backward Compatibility)
-    # -----------------------------------
+    # ----------------------------------------
+    # LEGACY TOOL
+    # ----------------------------------------
 
     if parsed["type"] == "tool":
 
-        plan = [
-            parsed["data"]
-        ]
+        plan = Plan(
+            goal="Single Tool",
+            summary="Legacy execution",
+            risk="LOW",
+            actions=[parsed["data"]],
+        )
 
-    # -----------------------------------
-    # Planner
-    # -----------------------------------
+    # ----------------------------------------
+    # PLANNER
+    # ----------------------------------------
 
     elif parsed["type"] == "plan":
 
-        plan = parsed["data"]
+        data = parsed["data"]
+
+        plan = Plan(
+            goal=data.get("goal", ""),
+            summary=data.get("summary", ""),
+            risk=data.get("risk", "LOW"),
+            actions=data.get("plan", []),
+        )
 
     else:
 
         print("Unknown response.")
         continue
 
-    # -----------------------------------
-    # Approval
-    # -----------------------------------
+    # ----------------------------------------
+    # VALIDATE
+    # ----------------------------------------
 
-    approved = request_approval(plan)
+    errors = Planner.validate(plan)
 
-    if not approved:
+    if errors:
+
+        print("\nInvalid Plan\n")
+
+        for err in errors:
+            print(f"• {err}")
+
+        continue
+
+    # ----------------------------------------
+    # SHOW PLAN
+    # ----------------------------------------
+
+    Planner.print(plan)
+
+    # ----------------------------------------
+    # APPROVAL
+    # ----------------------------------------
+
+    if not request_approval(plan.actions):
 
         print("\nExecution cancelled.\n")
         continue
 
-    # -----------------------------------
-    # Execute Plan
-    # -----------------------------------
+    # ----------------------------------------
+    # EXECUTE
+    # ----------------------------------------
 
     print("\nExecuting...\n")
 
-    for i, step in enumerate(plan, start=1):
+    success = 0
+    failed = 0
 
-        print(f"Step {i}")
+    for index, step in enumerate(plan.actions, start=1):
+
+        print(f"Step {index}")
 
         result = execute(step)
 
         print(json.dumps(result, indent=4))
         print()
 
-    print("Plan completed.")
+        if result.get("success", False):
+            success += 1
+        else:
+            failed += 1
+            print("Execution stopped.")
+            break
+
+    # ----------------------------------------
+    # SUMMARY
+    # ----------------------------------------
+
+    print("=" * 60)
+    print("EXECUTION SUMMARY")
+    print("=" * 60)
+    print(f"Goal    : {plan.goal}")
+    print(f"Success : {success}")
+    print(f"Failed  : {failed}")
+    print("=" * 60)
