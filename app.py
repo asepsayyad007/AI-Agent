@@ -1,10 +1,11 @@
 from agent.graph import ask
 from agent.parser import parse_tool_call
 from tools.dispatcher import execute
+import json
 
 history = []
 
-print("===== AI Agent v0.5 =====")
+print("===== AI Agent v0.6 =====")
 
 while True:
 
@@ -24,7 +25,7 @@ while True:
 
         tool = parse_tool_call(reply)
 
-        # No tool needed
+        # AI answered normally
         if tool is None:
 
             history.append({
@@ -37,7 +38,28 @@ while True:
         # Execute requested tool
         output = execute(tool)
 
+        print("\nTool Output:\n")
+        print(json.dumps(output, indent=4))
+
+        # VERY IMPORTANT
+        history.append({
+            "role": "assistant",
+            "content": reply
+        })
+
         history.append({
             "role": "user",
-            "content": str(output)
+            "content":
+f"""
+The requested tool has already been executed.
+
+Tool Output:
+
+{json.dumps(output, indent=4)}
+
+If the task is complete,
+respond normally.
+
+Otherwise call another tool.
+"""
         })
