@@ -1,0 +1,10 @@
+ollama
+langchain
+langgraph
+langchain-community
+rich
+typer
+python-dotenv
+watchdog
+gitpython
+playwright
