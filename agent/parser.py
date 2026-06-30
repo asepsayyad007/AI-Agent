@@ -2,40 +2,76 @@ import json
 import re
 
 
-def parse_tool_call(reply: str):
+def parse_ai_response(reply: str):
     """
-    Parse JSON tool calls.
+    Parses AI responses.
 
-    Supports:
+    Returns:
 
     {
-        ...
+        "type": "tool",
+        "data": {...}
     }
 
-    and
+    or
 
-    ```json
     {
-        ...
+        "type": "plan",
+        "data": [...]
     }
-    ```
+
+    or
+
+    {
+        "type": "text",
+        "data": "..."
+    }
     """
 
     reply = reply.strip()
 
-    # Remove markdown code fences if present
-    match = re.search(r"```(?:json)?\s*(.*?)\s*```", reply, re.DOTALL)
+    # Remove markdown
+    match = re.search(
+        r"```(?:json)?\s*(.*?)\s*```",
+        reply,
+        re.DOTALL
+    )
 
     if match:
         reply = match.group(1).strip()
 
     try:
-        tool = json.loads(reply)
 
-        if isinstance(tool, dict) and "tool" in tool:
-            return tool
+        obj = json.loads(reply)
+
+        # -------------------------
+        # Single Tool
+        # -------------------------
+
+        if isinstance(obj, dict):
+
+            if "tool" in obj:
+
+                return {
+                    "type": "tool",
+                    "data": obj
+                }
+
+            # -------------------------
+            # Planner
+            # -------------------------
+
+            if "plan" in obj:
+
+                return {
+                    "type": "plan",
+                    "data": obj["plan"]
+                }
 
     except Exception:
         pass
 
-    return None
+    return {
+        "type": "text",
+        "data": reply
+    }
