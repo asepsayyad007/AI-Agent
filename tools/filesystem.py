@@ -1,15 +1,22 @@
 from pathlib import Path
 
+from tools.security import validate_path
+
 
 def read_file(path: str):
-    """
-    Read a file.
-    """
+
+    allowed, file = validate_path(path)
+
+    if not allowed:
+        return {
+            "success": False,
+            "error": "Access denied. Path is outside the workspace."
+        }
 
     try:
         return {
             "success": True,
-            "content": Path(path).read_text(encoding="utf-8")
+            "content": file.read_text(encoding="utf-8")
         }
 
     except Exception as e:
@@ -20,14 +27,16 @@ def read_file(path: str):
 
 
 def write_file(path: str, content: str):
-    """
-    Create or overwrite a file.
-    """
+
+    allowed, file = validate_path(path)
+
+    if not allowed:
+        return {
+            "success": False,
+            "error": "Access denied. Path is outside the workspace."
+        }
 
     try:
-
-        file = Path(path)
-
         file.parent.mkdir(parents=True, exist_ok=True)
 
         file.write_text(
@@ -40,7 +49,6 @@ def write_file(path: str, content: str):
         }
 
     except Exception as e:
-
         return {
             "success": False,
             "error": str(e)
@@ -48,13 +56,18 @@ def write_file(path: str, content: str):
 
 
 def delete_file(path: str):
-    """
-    Delete a file.
-    """
+
+    allowed, file = validate_path(path)
+
+    if not allowed:
+        return {
+            "success": False,
+            "error": "Access denied. Path is outside the workspace."
+        }
 
     try:
 
-        Path(path).unlink()
+        file.unlink()
 
         return {
             "success": True
@@ -68,18 +81,22 @@ def delete_file(path: str):
         }
 
 
-def list_directory(path="."):
-    """
-    List directory contents.
-    """
+def list_directory(path=""):
+
+    allowed, directory = validate_path(path)
+
+    if not allowed:
+        return {
+            "success": False,
+            "error": "Access denied. Path is outside the workspace."
+        }
 
     try:
 
         items = []
 
-        for item in Path(path).iterdir():
-
-            items.append(str(item))
+        for item in directory.iterdir():
+            items.append(item.name)
 
         return {
             "success": True,
@@ -96,7 +113,15 @@ def list_directory(path="."):
 
 def exists(path: str):
 
+    allowed, file = validate_path(path)
+
+    if not allowed:
+        return {
+            "success": False,
+            "error": "Access denied. Path is outside the workspace."
+        }
+
     return {
         "success": True,
-        "exists": Path(path).exists()
+        "exists": file.exists()
     }
