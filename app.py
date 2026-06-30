@@ -1,43 +1,67 @@
 from agent.graph import ask
+from agent.parser import parse_tool_call
 from tools.terminal import run
 
 history = []
 
-print("===== AI Agent =====")
+print("===== AI Agent v0.4 =====")
 
 while True:
 
     user = input("\nYou > ")
 
-    history.append(
-        {
-            "role": "user",
-            "content": user
-        }
-    )
+    history.append({
+        "role": "user",
+        "content": user
+    })
 
-    reply = ask(history)
+    while True:
 
-    print("\nAI:\n")
-    print(reply)
+        reply = ask(history)
 
-    history.append(
-        {
+        print("\nAI:\n")
+        print(reply)
+
+        tool = parse_tool_call(reply)
+
+        # If AI wants to use a tool
+        if tool:
+
+            if tool["tool"] == "terminal":
+
+                command = tool["command"]
+
+                print(f"\nExecuting: {command}\n")
+
+                result = run(command)
+
+                tool_output = f"""
+Command:
+{command}
+
+Return Code:
+{result["returncode"]}
+
+STDOUT:
+{result["stdout"]}
+
+STDERR:
+{result["stderr"]}
+"""
+
+                # Give command output back to AI
+                history.append({
+                    "role": "user",
+                    "content": tool_output
+                })
+
+                # Let AI think again
+                continue
+
+        # Normal response
+        history.append({
             "role": "assistant",
             "content": reply
-        }
-    )
+        })
 
-    if reply.startswith("TOOL: terminal"):
-
-        command = reply.split("COMMAND:")[1].strip()
-
-        print("\nExecuting...\n")
-
-        result = run(command)
-
-        print(result["stdout"])
-
-        if result["stderr"]:
-            print(result["stderr"])
-
+        break

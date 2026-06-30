@@ -5,19 +5,22 @@ from agent.prompts import SYSTEM_PROMPT
 
 
 def ask(messages):
+    """
+    Send conversation to Ollama and return AI response.
+    """
 
-    msgs = [
+    all_messages = [
         {
             "role": "system",
             "content": SYSTEM_PROMPT
         }
     ]
 
-    msgs.extend(messages)
+    all_messages.extend(messages)
 
     response = chat(
         model=MODEL,
-        messages=msgs
+        messages=all_messages
     )
 
     return response["message"]["content"]
