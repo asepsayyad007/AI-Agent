@@ -9,8 +9,6 @@ AVAILABLE TOOLS
 
 1. Terminal
 
-Example:
-
 {
     "tool": "terminal",
     "command": "python --version"
@@ -20,8 +18,6 @@ Example:
 
 2. Read File
 
-Example:
-
 {
     "tool": "read_file",
     "path": "app.py"
@@ -30,8 +26,6 @@ Example:
 --------------------------------------------------
 
 3. Write File
-
-Example:
 
 {
     "tool": "write_file",
@@ -43,8 +37,6 @@ Example:
 
 4. Delete File
 
-Example:
-
 {
     "tool": "delete_file",
     "path": "workspace/index.html"
@@ -53,8 +45,6 @@ Example:
 --------------------------------------------------
 
 5. List Directory
-
-Example:
 
 {
     "tool": "list_directory",
@@ -65,11 +55,124 @@ Example:
 
 6. Check File Exists
 
-Example:
-
 {
     "tool": "exists",
     "path": "workspace/index.html"
+}
+
+--------------------------------------------------
+
+7. Git Status
+
+{
+    "tool": "git_status",
+    "path": "."
+}
+
+--------------------------------------------------
+
+8. Git Log
+
+{
+    "tool": "git_log",
+    "path": ".",
+    "count": 5
+}
+
+--------------------------------------------------
+
+9. Git Diff
+
+{
+    "tool": "git_diff",
+    "path": ".",
+    "staged": false
+}
+
+--------------------------------------------------
+
+10. Git Add
+
+{
+    "tool": "git_add",
+    "path": ".",
+    "files": ["app.py", "config.py"]
+}
+
+--------------------------------------------------
+
+11. Git Commit
+
+{
+    "tool": "git_commit",
+    "path": ".",
+    "message": "feat: add new feature"
+}
+
+--------------------------------------------------
+
+12. Git Branch
+
+{
+    "tool": "git_branch",
+    "path": ".",
+    "name": "feature-x",
+    "checkout": false
+}
+
+--------------------------------------------------
+
+13. Git Checkout
+
+{
+    "tool": "git_checkout",
+    "path": ".",
+    "branch": "main"
+}
+
+--------------------------------------------------
+
+14. Git Push
+
+{
+    "tool": "git_push",
+    "path": ".",
+    "remote": "origin",
+    "branch": "main"
+}
+
+--------------------------------------------------
+
+15. Git Pull
+
+{
+    "tool": "git_pull",
+    "path": ".",
+    "remote": "origin",
+    "branch": "main"
+}
+
+--------------------------------------------------
+
+16. Browse URL
+
+{
+    "tool": "browse",
+    "url": "https://example.com",
+    "action": "text"
+}
+
+Actions: text, html, screenshot, links, click, type
+For click: "selector" is a CSS selector
+For type: "selector" is "css_selector|text_to_type"
+
+--------------------------------------------------
+
+17. Web Search
+
+{
+    "tool": "search",
+    "query": "python asyncio tutorial"
 }
 
 ==================================================
@@ -95,4 +198,8 @@ RULES
 9. Prefer filesystem tools over terminal commands for any file operation.
 
 10. Use the terminal only for executing programs or shell commands.
+
+11. Use git tools for all version control operations.
+
+12. Use browse/search tools to look up information online.
 """

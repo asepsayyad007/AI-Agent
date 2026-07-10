@@ -6,6 +6,18 @@ from tools.filesystem import (
     list_directory,
     exists,
 )
+from tools.git import (
+    git_status,
+    git_log,
+    git_diff,
+    git_add,
+    git_commit,
+    git_branch,
+    git_checkout,
+    git_push,
+    git_pull,
+)
+from tools.browser import browse, search
 
 
 def execute(tool_call: dict):
@@ -69,6 +81,71 @@ def execute(tool_call: dict):
         return exists(
             tool_call["path"]
         )
+
+    # -----------------------------
+    # GIT
+    # -----------------------------
+
+    if tool == "git_status":
+        path = tool_call.get("path", ".")
+        return git_status(path)
+
+    if tool == "git_log":
+        path = tool_call.get("path", ".")
+        count = tool_call.get("count", 10)
+        return git_log(path, count)
+
+    if tool == "git_diff":
+        path = tool_call.get("path", ".")
+        staged = tool_call.get("staged", False)
+        return git_diff(path, staged)
+
+    if tool == "git_add":
+        path = tool_call.get("path", ".")
+        files = tool_call.get("files", None)
+        return git_add(path, files)
+
+    if tool == "git_commit":
+        path = tool_call.get("path", ".")
+        message = tool_call.get("message", "")
+        return git_commit(path, message)
+
+    if tool == "git_branch":
+        path = tool_call.get("path", ".")
+        name = tool_call.get("name", None)
+        checkout = tool_call.get("checkout", False)
+        return git_branch(path, name, checkout)
+
+    if tool == "git_checkout":
+        path = tool_call.get("path", ".")
+        branch = tool_call.get("branch", "")
+        return git_checkout(path, branch)
+
+    if tool == "git_push":
+        path = tool_call.get("path", ".")
+        remote = tool_call.get("remote", "origin")
+        branch = tool_call.get("branch", None)
+        return git_push(path, remote, branch)
+
+    if tool == "git_pull":
+        path = tool_call.get("path", ".")
+        remote = tool_call.get("remote", "origin")
+        branch = tool_call.get("branch", None)
+        return git_pull(path, remote, branch)
+
+    # -----------------------------
+    # BROWSER
+    # -----------------------------
+
+    if tool == "browse":
+        url = tool_call.get("url", "")
+        action = tool_call.get("action", "text")
+        selector = tool_call.get("selector", None)
+        return browse(url, action, selector)
+
+    if tool == "search":
+        query = tool_call.get("query", "")
+        return search(query)
 
     # -----------------------------
     # UNKNOWN TOOL

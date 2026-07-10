@@ -1,12 +1,13 @@
 from ollama import chat
 
-from config import MODEL
+from config import get_model
 from agent.prompts import SYSTEM_PROMPT
 
 
 def ask(messages):
     """
     Send conversation to Ollama and return AI response.
+    Uses the currently active model from config.
     """
 
     all_messages = [
@@ -19,7 +20,7 @@ def ask(messages):
     all_messages.extend(messages)
 
     response = chat(
-        model=MODEL,
+        model=get_model(),
         messages=all_messages
     )
 
