@@ -54,3 +54,42 @@ def list_models():
         }
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+# ==========================================
+# SECURITY CONFIGURATION
+# ==========================================
+
+import os
+
+# Workspace directory - all file operations are restricted to this path
+WORKSPACE_DIR = os.path.abspath("workspace")
+
+# Blocked terminal commands (case-insensitive partial matches)
+BLOCKED_COMMANDS = [
+    "rm -rf /",
+    "rm -rf /*",
+    "del /s /q c:\\",
+    "format c:",
+    "mkfs",
+    "dd if=",
+    "shutdown",
+    "reboot",
+    ":(){:|:&};:",
+    "fork bomb",
+    "del /f /s /q",
+    "rd /s /q c:\\",
+    "rmdir /s /q c:\\",
+]
+
+# Confirmation mode: "off", "destructive", "all"
+CONFIRM_MODE = "destructive"
+
+# ==========================================
+# CONTEXT CONFIGURATION
+# ==========================================
+
+# Maximum tokens before auto-truncation (estimate)
+MAX_CONTEXT_TOKENS = 6000
+
+# Max tool call retries on validation failure
+MAX_RETRIES = 3

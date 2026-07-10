@@ -13,11 +13,13 @@ import json
 import sys
 import os
 
-from agent.graph import ask
+from agent.graph import ask, check_ollama
 from agent.parser import parse_tool_call
+from agent.context import get_token_usage, truncate_history
 from tools.dispatcher import execute
+from tools.schemas import validate_tool_call
 from tools.browser import search
-from config import set_model, list_models, get_model, MODELS
+from config import set_model, list_models, get_model, MODELS, CONFIRM_MODE, MAX_RETRIES
 
 console = Console()
 history = []
@@ -30,7 +32,7 @@ def print_banner():
     """Print the startup banner."""
     banner_text = Text()
     banner_text.append("AI Agent", style="bold bright_cyan")
-    banner_text.append(" v0.8", style="dim")
+    banner_text.append(" v0.9", style="dim")
 
     banner = Panel(
         banner_text,
@@ -57,6 +59,8 @@ def print_help():
     table.add_row("/model <name>", "Switch model (fast, heavy, reason, or full name)")
     table.add_row("/models", "List available models and presets")
     table.add_row("/search <query>", "Search the internet directly")
+    table.add_row("/tokens", "Show token usage for current conversation")
+    table.add_row("/confirm", "Toggle tool confirmation mode")
     table.add_row("/verbose", "Toggle tool call visibility")
     table.add_row("/clear", "Clear conversation history")
     table.add_row("/help", "Show this help message")
@@ -98,7 +102,6 @@ def print_search_results(query: str, results: dict):
 
     console.print(table)
 
-    # Show snippets below
     console.print()
     for i, item in enumerate(items, 1):
         snippet = item.get("snippet", "")
@@ -227,9 +230,55 @@ def print_models_info():
     console.print()
 
 
+def print_token_usage():
+    """Display token usage for current conversation."""
+    usage = get_token_usage(history)
+    bar_width = 30
+    filled = int((usage["percentage"] / 100) * bar_width)
+    bar = "█" * filled + "░" * (bar_width - filled)
+
+    color = "green"
+    if usage["percentage"] > 70:
+        color = "yellow"
+    if usage["percentage"] > 90:
+        color = "red"
+
+    console.print(f"\n  [{color}]{bar}[/{color}] {usage['percentage']}%")
+    console.print(f"  [dim]Tokens: {usage['used']} / {usage['max']} (remaining: {usage['remaining']})[/dim]")
+    console.print(f"  [dim]Messages: {len(history)}[/dim]\n")
+
+
+def confirm_tool_execution(tool_call: dict) -> bool:
+    """Ask user to confirm tool execution. Returns True if approved."""
+    global CONFIRM_MODE
+
+    if CONFIRM_MODE == "off":
+        return True
+
+    tool = tool_call.get("tool", "")
+    destructive_tools = ["terminal", "write_file", "delete_file", "git_push", "git_commit"]
+
+    if CONFIRM_MODE == "destructive" and tool not in destructive_tools:
+        return True
+
+    # Show what will be executed
+    display = dict(tool_call)
+    if "content" in display and len(str(display["content"])) > 100:
+        display["content"] = str(display["content"])[:100] + "..."
+
+    console.print(f"\n  [yellow]⚠ Confirm tool execution:[/yellow]")
+    console.print(f"  [dim]{json.dumps(display, indent=2)}[/dim]")
+
+    try:
+        answer = console.input("  [bold yellow]Execute? (y/n):[/bold yellow] ")
+        return answer.strip().lower() in ("y", "yes", "")
+    except (KeyboardInterrupt, EOFError):
+        return False
+
+
 def handle_command(user_input: str) -> bool:
     """Handle slash commands. Returns True if should continue loop."""
-    global VERBOSE
+    global VERBOSE, CONFIRM_MODE
     cmd = user_input.strip().lower()
 
     if cmd in ("/exit", "/quit", "/q"):
@@ -243,6 +292,17 @@ def handle_command(user_input: str) -> bool:
 
     elif cmd == "/help":
         print_help()
+        return True
+
+    elif cmd == "/tokens":
+        print_token_usage()
+        return True
+
+    elif cmd == "/confirm":
+        modes = ["off", "destructive", "all"]
+        current_idx = modes.index(CONFIRM_MODE) if CONFIRM_MODE in modes else 0
+        CONFIRM_MODE = modes[(current_idx + 1) % len(modes)]
+        console.print(f"[green]✓ Confirm mode:[/green] [bold]{CONFIRM_MODE}[/bold]\n")
         return True
 
     elif cmd == "/verbose":
@@ -296,16 +356,29 @@ def get_user_input() -> str:
 
 
 def run_agent_loop(user_message: str):
-    """Run the agent tool-calling loop."""
+    """Run the agent tool-calling loop with validation and context management."""
+    global history
+
     history.append({
         "role": "user",
         "content": user_message
     })
 
+    # Auto-truncate history if too long
+    history = truncate_history(history)
+
+    retries_left = MAX_RETRIES
+
     while True:
         # Show thinking spinner
         with console.status("[bold bright_cyan]Thinking...[/bold bright_cyan]", spinner="dots"):
             reply = ask(history)
+
+        # Handle error responses from ask()
+        if reply.startswith("[ERROR]"):
+            console.print(f"\n  [red]{reply}[/red]\n")
+            history.append({"role": "assistant", "content": reply})
+            break
 
         tool = parse_tool_call(reply)
 
@@ -318,7 +391,38 @@ def run_agent_loop(user_message: str):
             })
             break
 
-        # AI wants to call a tool
+        # Validate tool call
+        validation = validate_tool_call(tool)
+        if not validation["valid"]:
+            retries_left -= 1
+            if retries_left <= 0:
+                console.print(f"\n  [red]✗ Tool validation failed after {MAX_RETRIES} retries: {validation['error']}[/red]\n")
+                history.append({"role": "assistant", "content": reply})
+                break
+
+            # Ask LLM to fix the tool call
+            console.print(f"  [yellow]⚠ Invalid tool call: {validation['error']} (retrying...)[/yellow]")
+            history.append({"role": "assistant", "content": reply})
+            history.append({
+                "role": "user",
+                "content": f"Your tool call was invalid: {validation['error']}\nPlease fix and try again with valid JSON."
+            })
+            continue
+
+        # Reset retries on valid tool call
+        retries_left = MAX_RETRIES
+
+        # Confirmation check
+        if not confirm_tool_execution(tool):
+            console.print("  [dim]Skipped.[/dim]")
+            history.append({"role": "assistant", "content": reply})
+            history.append({
+                "role": "user",
+                "content": "The user declined to execute that tool. Please continue without it or try a different approach."
+            })
+            continue
+
+        # Show tool activity
         if VERBOSE:
             print_tool_call(tool)
         else:
@@ -326,7 +430,10 @@ def run_agent_loop(user_message: str):
 
         # Execute the tool with spinner
         with console.status("[bold yellow]Executing...[/bold yellow]", spinner="dots2"):
-            output = execute(tool)
+            try:
+                output = execute(tool)
+            except Exception as e:
+                output = {"success": False, "error": f"Tool execution error: {str(e)}"}
 
         if VERBOSE:
             print_tool_output(output)
@@ -359,25 +466,45 @@ def main():
     os.system("cls" if os.name == "nt" else "clear")
 
     print_banner()
-    print_help()
 
+    # Check Ollama connection
+    with console.status("[dim]Checking Ollama connection...[/dim]", spinner="dots"):
+        ollama_ok = check_ollama()
+
+    if not ollama_ok:
+        console.print("[red]⚠ Cannot connect to Ollama![/red]")
+        console.print("[dim]Make sure Ollama is running: ollama serve[/dim]\n")
+    else:
+        console.print("[green]✓ Ollama connected[/green]\n")
+
+    print_help()
     console.print(Rule(style="dim"))
     console.print()
 
     while True:
-        user_input = get_user_input()
+        try:
+            user_input = get_user_input()
 
-        if not user_input.strip():
+            if not user_input.strip():
+                continue
+
+            # Handle slash commands
+            if user_input.strip().startswith("/"):
+                handle_command(user_input)
+                continue
+
+            # Run the agent
+            console.print()
+            run_agent_loop(user_input)
+
+        except KeyboardInterrupt:
+            console.print("\n[dim]Interrupted. Type /exit to quit.[/dim]")
             continue
 
-        # Handle slash commands
-        if user_input.strip().startswith("/"):
-            handle_command(user_input)
+        except Exception as e:
+            console.print(f"\n[red]Unexpected error: {str(e)}[/red]")
+            console.print("[dim]The agent recovered. You can continue.[/dim]\n")
             continue
-
-        # Run the agent
-        console.print()
-        run_agent_loop(user_input)
 
 
 if __name__ == "__main__":

@@ -6,7 +6,7 @@
 
 Built with [Ollama](https://ollama.com) • No API keys • No cloud • Complete privacy
 
-![Version](https://img.shields.io/badge/version-0.8-blue)
+![Version](https://img.shields.io/badge/version-0.9-blue)
 ![Python](https://img.shields.io/badge/python-3.10+-green)
 ![License](https://img.shields.io/badge/license-MIT-orange)
 
@@ -34,6 +34,10 @@ Think of it as your personal offline Copilot that can actually *do* things, not 
 | 🧠 **Multi-Model** | Switch between models on the fly (fast, heavy, reasoning) |
 | 🔒 **Fully Offline** | No API keys, no cloud, everything runs locally |
 | 🔄 **Autonomous Loop** | Agent chains multiple tools until the task is done |
+| 🛡️ **Sandboxed Execution** | Filesystem restricted to workspace, command blocklist |
+| ✅ **Input Validation** | Tool call schemas with auto-retry on malformed JSON |
+| 📊 **Token Management** | Auto-truncation, /tokens command with usage bar |
+| 🔄 **Error Recovery** | Retry with backoff, graceful error handling |
 
 ---
 
@@ -92,7 +96,7 @@ python app.py
 ### Basic Interaction
 
 ```
-===== AI Agent v0.8 =====
+===== AI Agent v0.9 =====
 Model: qwen2.5-coder:7b
 
 You > Create a Python Flask app with a home page and an about page
@@ -115,6 +119,8 @@ I've created a Flask app with two routes...
 | `/models` | List installed models and presets |
 | `/clear` | Clear conversation history |
 | `/exit` | Exit the agent |
+| `/tokens` | Show token usage for current conversation |
+| `/confirm` | Toggle tool confirmation mode (off/destructive/all) |
 
 ### Model Presets
 
